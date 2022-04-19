@@ -1,6 +1,6 @@
 # Introduction to Heterogeneous Agent Macroeconomics
 Arshia Hashemi  
-Kenneth C. Giffin Department of Economics  
+Kenneth C. Griffin Department of Economics  
 The University of Chicago  
 arshiahashemi@uchicago.edu  
 https://www.arshiahashemi.com/ 
