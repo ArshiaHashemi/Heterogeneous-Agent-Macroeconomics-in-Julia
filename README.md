@@ -5,4 +5,4 @@ The University of Chicago
 arshiahashemi@uchicago.edu  
 https://www.arshiahashemi.com/ 
 
-PURPOSE: This repository contains Julia code for Greg Kaplan's undergraduate/master's class on heterogeneous agent macroeconomics at The University of Chicago. Please proceed to my website https://www.arshiahashemi.com/teaching for my slides.
+This repository contains Julia code for Greg Kaplan's undergraduate/master's class on heterogeneous agent macroeconomics at The University of Chicago. Please proceed to my website https://www.arshiahashemi.com/teaching for my slides.
