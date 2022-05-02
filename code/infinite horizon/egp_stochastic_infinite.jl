@@ -1,6 +1,6 @@
 ################################################################################
 #
-#   PURPOSE: Infinite Horizon Stochastic Euler Equation Iteration
+#   PURPOSE: Infinite Horizon Dynamic Programming with Endogenous Grid Points
 #   AUTHOR: Arshia Hashemi
 #   EMAIL: arshiahashemi@uchicago.edu
 #   FIRST VERSION: 04/05/2022
@@ -28,8 +28,7 @@ using DataFrames,
     LinearAlgebra,
     Colors,
     LaTeXStrings,
-    Plots,
-    Roots
+    Plots
 
 ## Parameters
 
@@ -97,6 +96,12 @@ end;
 function utility_derivative(𝑐)
     𝑢 = 𝑐^(-γ)
     return 𝑢
+end;
+
+# Inverse of derivative of utility function
+function utility_derivative_inverse(𝑢)
+    𝑐 = 𝑢^(-1 / γ)
+    return 𝑐
 end;
 
 # Linear interpolation
@@ -212,7 +217,12 @@ for 𝑦 = 1:𝑛
     𝑋[:, 𝑦] = 𝑎̲ .+ (𝑎̅ - 𝑎̲) .* 𝑥 .+ 𝑌_net[𝑦]
 end;
 
-## Euler Equation Iteration
+# Savings grid
+𝑧 = collect(range(0, stop = 1, length = 𝑁));
+𝑥 = 𝑧 .^ (1 / α);
+𝑆 = 𝑎̲ .+ (𝑎̅ - 𝑎̲) .* 𝑥;
+
+## Endogenous Grid Points Method
 
 # Initialize policy functions
 𝐂_guess = Matrix(undef, 𝑁, 𝑛);
@@ -230,58 +240,58 @@ iter = 0;
 
 # Iteration
 while iter <= max_it && 𝐂_diff > tol
-    # Initalize policy functions
+    # Initalize policy function for current iteration
     𝐂_new = Matrix(undef, 𝑁, 𝑛)
-    # Interpolating Function
-    function emuc(𝐜, 𝑥, 𝑦)
-        # Compute next period's asset value given current period consumption 𝐜
-        𝐚′ = 𝑋[𝑥, 𝑦] - 𝐜
-        # Intialize vector with next period's interpolated consumption functions
+    # Interpolating function
+    function x(𝑠, 𝑦)
+        # Initialize
         𝐦𝐮_interp = Vector(undef, 𝑛)
         # Loop over next period's labor income
         for 𝑦′ = 1:𝑛
-            # Compute next period's cash on hand given net labor income 𝑦′
-            𝐱′ = (1 + 𝑟) * 𝐚′ + 𝑌_net[𝑦′]
-            # Interpolate next period's consumption function
+            # Law of motion for cash on hand next period
+            𝐱′ = (1 + 𝑟) * 𝑆[𝑠] + 𝑌_net[𝑦′]
+            # Interpolate next period's consumption
             𝐂_interp = lininterp(𝑋[:, 𝑦′], 𝐂[:, 𝑦′], 𝐱′)
             # Evaluate marginal utility at interlopolated consumption
             𝐦𝐮_interp[𝑦′] = utility_derivative(𝐂_interp)
         end
-        # Compute expected marginal utility next period
+        # Compute next period's expected marginal utility of consumption
         𝐞𝐦𝐮𝐜 = sum(𝐦𝐮_interp .* 𝑃[𝑦, :])
+        # Compute RHS of Euler equation
+        𝐦𝐮𝐜 = β * (1 + 𝑟) * 𝐞𝐦𝐮𝐜
+        # Consumption as a function of current period's savings and labor income
+        𝐜 = utility_derivative_inverse(𝐦𝐮𝐜)
+        # Cash on hand as a function of current period's savings and labor income
+        𝐱 = 𝑆[𝑠] + 𝐜
         # Return output
-        return 𝐞𝐦𝐮𝐜
+        return 𝐱
+    end
+    # Compute cash on hand as a function of current period's savings and labor income
+    𝐗 = Matrix(undef, 𝑁, 𝑛)
+    # Loop over current labor income
+    for 𝑦 = 1:𝑛
+        # Loop over savings
+        for 𝑠 = 1:𝑁
+            # Cash on hand this period
+            𝐗[𝑠, 𝑦] = x(𝑠, 𝑦)
+        end
     end
     # Loop over current period's labor income
     for 𝑦 = 1:𝑛
         # Loop over current period's cash on hand
         for 𝑥 = 1:𝑁
-            # Consumption at borrowing constraint
-            𝐜_lim = 𝑋[𝑥, 𝑦] - 𝑎̲
-            # LHS of Euler equation if borrowing constraint binds
-            𝐋 = utility_derivative(𝐜_lim)
-            # RHS of Euler equation if borrowing constraint binds
-            𝐑 = β * (1 + 𝑟) * emuc(𝐜_lim, 𝑥, 𝑦)
-            # Generate indicator for whether borrowing constraint binds
-            if 𝐋 >= 𝐑
-                𝐈 = 1
-            elseif 𝐋 < 𝐑
-                𝐈 = 0
-            end
-            # Case 1: Borrowing constraint binds
-            if 𝐈 == 1
-                # Update savings policy function
+            # Borrowing constraint binds
+            if 𝑋[𝑥, 𝑦] < 𝐗[1, 𝑦]
                 𝐒[𝑥, 𝑦] = 𝑎̲
-                # Update consumption policy function
                 𝐂_new[𝑥, 𝑦] = 𝑋[𝑥, 𝑦] - 𝐒[𝑥, 𝑦]
-                # Case 2: Borrowing constraint does not bind
-            elseif 𝐈 == 0
-                # Define nonlinear equation to solve
-                f(𝐜) = utility_derivative(𝐜) - β * (1 + 𝑟) * emuc(𝐜, 𝑥, 𝑦)
-                # Solve nonlinear equation and update consumption policy function
-                𝐂_new[𝑥, 𝑦] = find_zero(f, 𝐂[𝑥, 𝑦])
-                # Update savings policy function
-                𝐒[𝑥, 𝑦] = 𝑋[𝑥, 𝑦] - 𝐂_new[𝑥, 𝑦]
+                # Borrowing constraint does not bind
+            else
+                # Cash on hand
+                𝐱 = 𝑋[𝑥, 𝑦]
+                # Interpolate savings policy function
+                𝐒[𝑥, 𝑦] = lininterp(𝐗[:, 𝑦], 𝑆, 𝐱)
+                # Recover consumption
+                𝐂_new[𝑥, 𝑦] = 𝑋[𝑥, 𝑦] - 𝐒[𝑥, 𝑦]
             end
         end
     end
@@ -315,7 +325,7 @@ plot!(
     xlabel = "Cash on Hand",
     ylabel = "Consumption",
 );
-savefig("consumption_policy_function_income_state.png");
+savefig("output\\consumption_policy_function_income_state.png");
 
 # Compute savings rate
 𝐒_rate = Matrix(undef, 𝑁, 𝑛)
@@ -348,7 +358,7 @@ plot!(
     xlabel = "Cash on Hand",
     ylabel = "Savings Rate",
 );
-savefig("savings_policy_function_income_state.png");
+savefig("output\\savings_policy_function_income_state.png");
 
 ## Simulation
 
@@ -455,5 +465,5 @@ key = [
     "99th-50th ratio"
 ];
 inequality =
-    TableCol(L"\tau=0.30", key, [𝐀_zero; 𝐀_mean; 𝐀_median; 𝐀_90; 𝐀_99; A_99_50]);
+    TableCol(L"\tau=0.15", key, [𝐀_zero; 𝐀_mean; 𝐀_median; 𝐀_90; 𝐀_99; A_99_50]);
 to_tex(inequality) |> print
