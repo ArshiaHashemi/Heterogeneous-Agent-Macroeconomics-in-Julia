@@ -1,4 +1,4 @@
-# Introduction to Heterogeneous Agent Macroeconomics
+# Heterogeneous Agent Macroeconomics in Julia
 Arshia Hashemi  
 Kenneth C. Griffin Department of Economics  
 The University of Chicago  
