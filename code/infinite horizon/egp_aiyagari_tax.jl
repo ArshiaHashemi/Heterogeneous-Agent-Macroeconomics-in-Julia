@@ -393,7 +393,7 @@ diff_KL = Inf;
 # Initialize savings policy function
 𝐒 = Matrix(undef, 𝑁, 𝑛);
 
-# Iterate on the capital-labor ratio
+# Iterate on the capital-labor ratio (NB: This is very slow, it's better to solve asset market directly)
 while iter_KL <= max_it_KL && diff_KL > tol_KL
     # Interest rate
     𝑟 = r(𝐾𝐿)
